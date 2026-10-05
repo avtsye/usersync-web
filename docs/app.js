@@ -43,7 +43,7 @@
 
   function choose(f){
     if(!f) return;
-    if(f.size>30*1024*1024){alert("בגרסה הנוכחית גודל הקובץ המקסימלי הוא 30MB");return}
+    if(f.size>20*1024*1024){alert("בגרסה הנוכחית גודל הקובץ המקסימלי הוא 20MB");return}
     file=f;$("fileName").textContent=f.name+" · "+(f.size/1024/1024).toFixed(1)+"MB";
   }
   audio.addEventListener("change",()=>choose(audio.files[0]));
@@ -95,34 +95,48 @@
   }
 
   async function createTempBranch(id){
+    addLog("Reading main branch...");
     const ref=await apiJson("/repos/"+OWNER+"/"+REPO+"/git/ref/heads/"+BRANCH);
-    const commit=await apiJson("/repos/"+OWNER+"/"+REPO+"/git/commits/"+ref.object.sha);
-    setProgress(18,"מעלה את השיר ל-GitHub…");
-    const audioBlob=await createBlobFromFile(file);
-    let lyricsBlob=null;
-    if(lyrics.value.trim()){
-      setProgress(30,"מעלה את הטקסט שסיפקת…");
-      lyricsBlob=await createTextBlob(lyrics.value);
-    }
-    const treeEntries=[
-      {path:"job/audio",mode:"100644",type:"blob",sha:audioBlob.sha}
-    ];
-    if(lyricsBlob) treeEntries.push({path:"job/lyrics.txt",mode:"100644",type:"blob",sha:lyricsBlob.sha});
-    const tree=await apiJson("/repos/"+OWNER+"/"+REPO+"/git/trees",{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({base_tree:commit.tree.sha,tree:treeEntries})
-    });
-    const jobCommit=await apiJson("/repos/"+OWNER+"/"+REPO+"/git/commits",{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({message:"Temporary UserSync job "+id,tree:tree.sha,parents:[ref.object.sha]})
-    });
     const branch="jobs/"+id;
+
+    addLog("Creating temporary branch "+branch);
     await apiJson("/repos/"+OWNER+"/"+REPO+"/git/refs",{
       method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({ref:"refs/heads/"+branch,sha:jobCommit.sha})
+      body:JSON.stringify({ref:"refs/heads/"+branch,sha:ref.object.sha})
     });
     activeJobRef=branch;
-    return {branch,hasLyrics:!!lyricsBlob};
+
+    setProgress(20,"מכין את קובץ השמע להעלאה…");
+    const audioBytes=new Uint8Array(await file.arrayBuffer());
+    const audioBase64=bytesToBase64(audioBytes);
+
+    addLog("Uploading audio via Contents API...");
+    setProgress(30,"מעלה את השיר ל-GitHub…");
+    await apiJson("/repos/"+OWNER+"/"+REPO+"/contents/job/audio",{
+      method:"PUT",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        message:"Add temporary audio for "+id,
+        content:audioBase64,
+        branch:branch
+      })
+    });
+
+    let hasLyrics=false;
+    if(lyrics.value.trim()){
+      addLog("Uploading supplied text...");
+      setProgress(38,"מעלה את הטקסט שסיפקת…");
+      const lyricBase64=btoa(unescape(encodeURIComponent(lyrics.value)));
+      await apiJson("/repos/"+OWNER+"/"+REPO+"/contents/job/lyrics.txt",{
+        method:"PUT",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          message:"Add temporary lyrics for "+id,
+          content:lyricBase64,
+          branch:branch
+        })
+      });
+      hasLyrics=true;
+    }
+    return {branch,hasLyrics};
   }
 
   async function createRelease(id){
@@ -186,9 +200,10 @@
       start.disabled=true;setProgress(5,"בודק חיבור…");
       await checkToken();
       const id=jobId();
-      setProgress(10,"יוצר יעד תוצאה זמני…");activeRelease=await createRelease(id);
+      setProgress(10,"יוצר ענף עבודה זמני…");
       const job=await createTempBranch(id);
-      setProgress(46,"מפעיל GitHub Actions…");await dispatch(activeRelease,job);addLog("Workflow dispatched.");
+      setProgress(42,"יוצר יעד תוצאה זמני…");activeRelease=await createRelease(id);
+      setProgress(48,"מפעיל GitHub Actions…");await dispatch(activeRelease,job);addLog("Workflow dispatched.");
       const got=await waitForResult(activeRelease.id);
       setProgress(100,"ה־LRC מוכן ✓");
       const box=$("result");box.classList.remove("hidden");box.innerHTML="<b>הקובץ מוכן.</b><br><button id='downloadResult' class='primary'>הורד LRC</button> <button id='deleteJob' class='ghost'>מחק תוצאה זמנית</button>";
