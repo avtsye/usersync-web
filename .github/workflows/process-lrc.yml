@@ -65,7 +65,7 @@ jobs:
           UPLOAD_URL=$(gh api "/repos/${{ github.repository }}/releases/$RELEASE_ID" --jq '.upload_url' | sed 's/{?name,label}//')
           curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: text/plain; charset=utf-8" --data-binary @error.txt "$UPLOAD_URL?name=error.txt" || true
       - name: Delete temporary job branch
-        if: always()
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
           JOB_REF: ${{ inputs.job_ref }}
