@@ -164,10 +164,19 @@
 
   async function getRelease(id){return apiJson("/repos/"+OWNER+"/"+REPO+"/releases/"+id)}
   async function downloadAsset(asset,filename){
-    const r=await api("/repos/"+OWNER+"/"+REPO+"/releases/assets/"+asset.id,{headers:{Accept:"application/octet-stream"}});
-    if(!r.ok) throw new Error("לא ניתן להוריד את הפלט");
-    const blob=await r.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
-    a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+    try{
+      const r=await api("/repos/"+OWNER+"/"+REPO+"/releases/assets/"+asset.id,{headers:{Accept:"application/octet-stream"}});
+      if(!r.ok) throw new Error("API download failed");
+      const blob=await r.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
+      a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),30000);
+    }catch(e){
+      if(asset.browser_download_url){
+        window.open(asset.browser_download_url,"_blank","noopener");
+        return;
+      }
+      throw new Error("לא ניתן להוריד את הפלט");
+    }
   }
   async function cleanupRelease(){
     if(!activeRelease) return;
@@ -206,7 +215,9 @@
       setProgress(48,"מפעיל GitHub Actions…");await dispatch(activeRelease,job);addLog("Workflow dispatched.");
       const got=await waitForResult(activeRelease.id);
       setProgress(100,"ה־LRC מוכן ✓");
-      const box=$("result");box.classList.remove("hidden");box.innerHTML="<b>הקובץ מוכן.</b><br><button id='downloadResult' class='primary'>הורד LRC</button> <button id='deleteJob' class='ghost'>מחק תוצאה זמנית</button>";
+      const box=$("result");box.classList.remove("hidden");
+      const direct=got.result.browser_download_url||"#";
+      box.innerHTML="<b>הקובץ מוכן.</b><br><button id='downloadResult' class='primary'>הורד LRC</button> <a id='directDownload' class='ghost' style='text-decoration:none;display:inline-block;margin:8px 6px 0' target='_blank' rel='noopener' href='"+direct+"'>פתח הורדה ישירה מ-GitHub</a> <button id='deleteJob' class='ghost'>מחק תוצאה זמנית</button>";
       $("downloadResult").onclick=async()=>{await downloadAsset(got.result,(file.name.replace(/\.[^.]+$/,"")||"result")+".lrc")};
       $("deleteJob").onclick=async()=>{await cleanupRelease();box.innerHTML="<b>התוצאה הזמנית נמחקה.</b>"};
     }catch(e){fail(e)}
