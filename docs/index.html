@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>UserSync Web — יצירת LRC</title>
+  <link rel="stylesheet" href="./style.css?v=1">
+</head>
+<body>
+<main class="shell">
+<header><div><p class="eyebrow">UserSync Web</p><h1>הופכים שיר לקובץ LRC</h1><p class="sub">מעלים קובץ שמע, מדביקים את הטקסט, ו-GitHub Actions מסנכרן ומחזיר קובץ LRC.</p></div><span class="badge">MVP</span></header>
+<section class="card"><h2>1. חיבור ל-GitHub</h2><p class="muted">נדרש Fine-grained PAT עם הרשאות <b>Actions: Read/Write</b> ו-<b>Contents: Read/Write</b> רק למאגר הזה. הטוקן נשמר בזיכרון הלשונית בלבד.</p><div class="row"><input id="token" type="password" autocomplete="off" placeholder="github_pat_..."><button id="checkToken" class="secondary">בדוק חיבור</button></div><div id="authStatus" class="status"></div></section>
+<section class="card"><h2>2. קובץ השמע</h2><label id="dropzone" class="dropzone"><input id="audio" type="file" accept=".mp3,.wav,.flac,.m4a,.opus,audio/*" hidden><span class="dropIcon">♫</span><strong>גרור שיר לכאן או לחץ לבחירה</strong><small>MP3 / WAV / FLAC / M4A / OPUS · עד 45MB</small><span id="fileName"></span></label></section>
+<section class="card"><h2>3. הטקסט</h2><textarea id="lyrics" rows="12" placeholder="הדבק כאן את מילות השיר, שורה אחת לכל שורת LRC..."></textarea><div class="grid2"><label>שפה<select id="language"><option value="he" selected>עברית</option><option value="en">English</option><option value="auto">זיהוי אוטומטי</option></select></label><label>מודל<select id="model"><option value="small">small — מהיר</option><option value="medium" selected>medium — מומלץ</option><option value="large-v3-turbo">large-v3-turbo — מדויק יותר</option></select></label></div><label class="check"><input id="enhanced" type="checkbox" checked> Enhanced LRC — חותמת זמן לכל מילה כשאפשר</label></section>
+<section class="card actionCard"><button id="start" class="primary">צור LRC</button><button id="reset" class="ghost">איפוס</button><div id="progressWrap" class="progressWrap hidden"><div class="progress"><span id="bar"></span></div><div id="progressText">מתחיל…</div></div><pre id="log" class="log hidden"></pre><div id="result" class="result hidden"></div></section>
+<section class="card note"><b>פרטיות:</b> קובץ השמע מועלה זמנית ל-Draft Release במאגר שלך, מעובד ב-GitHub Actions, ואז קובץ המקור נמחק אוטומטית מה-Release.</section>
+</main><script src="./app.js?v=1"></script></body></html>
