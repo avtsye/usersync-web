@@ -1,0 +1,67 @@
+name: Process LRC
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        required: true
+      audio_asset_id:
+        required: true
+      lyrics_asset_id:
+        required: true
+      model:
+        required: true
+        default: medium
+        type: choice
+        options: [small, medium, large-v3-turbo]
+      language:
+        required: true
+        default: he
+      enhanced:
+        required: true
+        default: true
+        type: boolean
+permissions:
+  contents: write
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install -r requirements.txt
+      - name: Download temporary job assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUDIO_ID: ${{ inputs.audio_asset_id }}
+          LYRICS_ID: ${{ inputs.lyrics_asset_id }}
+        run: |
+          mkdir -p job
+          gh api -H "Accept: application/octet-stream" "/repos/${{ github.repository }}/releases/assets/$AUDIO_ID" > job/audio
+          gh api -H "Accept: application/octet-stream" "/repos/${{ github.repository }}/releases/assets/$LYRICS_ID" > job/lyrics.txt
+      - name: Generate LRC
+        run: |
+          python scripts/process.py --audio job/audio --lyrics job/lyrics.txt --output job/result.lrc --language "${{ inputs.language }}" --model "${{ inputs.model }}" ${{ inputs.enhanced && '--enhanced' || '' }}
+      - name: Upload result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+        run: |
+          UPLOAD_URL=$(gh api "/repos/${{ github.repository }}/releases/$RELEASE_ID" --jq '.upload_url' | sed 's/{?name,label}//')
+          curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @job/result.lrc "$UPLOAD_URL?name=result.lrc"
+      - name: Delete source assets
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUDIO_ID: ${{ inputs.audio_asset_id }}
+          LYRICS_ID: ${{ inputs.lyrics_asset_id }}
+        run: |
+          gh api -X DELETE "/repos/${{ github.repository }}/releases/assets/$AUDIO_ID" || true
+          gh api -X DELETE "/repos/${{ github.repository }}/releases/assets/$LYRICS_ID" || true
