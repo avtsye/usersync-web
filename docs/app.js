@@ -163,6 +163,15 @@
   }
 
   async function getRelease(id){return apiJson("/repos/"+OWNER+"/"+REPO+"/releases/"+id)}
+  async function getLatestResult(){
+    const releases=await apiJson("/repos/"+OWNER+"/"+REPO+"/releases?per_page=20");
+    for(const r of releases){
+      const asset=(r.assets||[]).find(x=>x.name==="result.lrc");
+      if(asset) return {release:r,result:asset};
+    }
+    throw new Error("לא נמצא קובץ LRC מוכן");
+  }
+
   async function downloadAsset(asset,filename){
     try{
       const r=await api("/repos/"+OWNER+"/"+REPO+"/releases/assets/"+asset.id,{headers:{Accept:"application/octet-stream"}});
@@ -200,6 +209,26 @@
     }
     throw new Error("פג זמן ההמתנה לתוצאה");
   }
+
+  $("lastResult").addEventListener("click",async()=>{
+    const btn=$("lastResult");
+    try{
+      btn.disabled=true;
+      setProgress(10,"מחפש את הקובץ האחרון…");
+      if(!token.value.trim()) throw new Error("יש להזין GitHub token");
+      await checkToken();
+      const got=await getLatestResult();
+      setProgress(100,"נמצא קובץ מוכן ✓");
+      const box=$("result");
+      box.classList.remove("hidden");
+      const direct=got.result.browser_download_url||"#";
+      box.innerHTML="<b>נמצא קובץ LRC מוכן.</b><br><a class='primary' style='text-decoration:none;display:inline-block;margin-top:8px' target='_blank' rel='noopener' href='"+direct+"'>הורד את הקובץ האחרון</a>";
+    }catch(e){
+      fail(e);
+    }finally{
+      btn.disabled=false;
+    }
+  });
 
   start.addEventListener("click",async()=>{
     try{
