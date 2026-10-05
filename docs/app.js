@@ -67,7 +67,7 @@
   }
   async function dispatch(release,a,l){
     const body={ref:BRANCH,inputs:{
-      release_id:String(release.id),audio_asset_id:String(a.id),lyrics_asset_id:String(l.id),
+      release_id:String(release.id),audio_asset_id:String(a.id),lyrics_asset_id:l?String(l.id):"",
       model:$("model").value,language:$("language").value,enhanced:$("enhanced").checked?"true":"false"
     }};
     const r=await api("/repos/"+OWNER+"/"+REPO+"/actions/workflows/"+WORKFLOW+"/dispatches",{
@@ -110,13 +110,18 @@
       $("result").classList.add("hidden");log.textContent="";
       if(!token.value.trim()) throw new Error("יש להזין GitHub token");
       if(!file) throw new Error("יש לבחור קובץ שמע");
-      if(!lyrics.value.trim()) throw new Error("יש להדביק את הטקסט");
       start.disabled=true;setProgress(5,"בודק חיבור…");
       await checkToken();
       const id=jobId();
       setProgress(12,"יוצר עבודה זמנית…");activeRelease=await createRelease(id);
       setProgress(22,"מעלה את השיר…");const aa=await uploadAsset(activeRelease,file,"audio"+((file.name.match(/\.[^.]+$/)||[""])[0]),file.type||"application/octet-stream");
-      setProgress(38,"מעלה את הטקסט…");const la=await uploadAsset(activeRelease,new Blob([lyrics.value],{type:"text/plain;charset=utf-8"}),"lyrics.txt","text/plain;charset=utf-8");
+      let la=null;
+      if(lyrics.value.trim()){
+        setProgress(36,"מעלה את הטקסט שסיפקת…");
+        la=await uploadAsset(activeRelease,new Blob([lyrics.value],{type:"text/plain;charset=utf-8"}),"lyrics.txt","text/plain;charset=utf-8");
+      } else {
+        setProgress(36,"לא סופק טקסט — המערכת תזהה אותו מהשמע…");
+      }
       setProgress(47,"מפעיל GitHub Actions…");await dispatch(activeRelease,aa,la);addLog("Workflow dispatched.");
       const got=await waitForResult(activeRelease.id);
       setProgress(100,"ה־LRC מוכן ✓");
