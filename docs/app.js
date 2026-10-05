@@ -143,7 +143,7 @@
     addLog("Creating temporary draft release "+id);
     return apiJson("/repos/"+OWNER+"/"+REPO+"/releases",{
       method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({tag_name:id,target_commitish:BRANCH,name:id,body:"Temporary UserSync Web processing job",draft:true,prerelease:false})
+      body:JSON.stringify({tag_name:id,target_commitish:BRANCH,name:id,body:"Temporary UserSync Web processing job",draft:false,prerelease:true})
     });
   }
 
