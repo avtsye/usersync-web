@@ -7,7 +7,8 @@ on:
       audio_asset_id:
         required: true
       lyrics_asset_id:
-        required: true
+        required: false
+        default: ""
       model:
         required: true
         default: medium
@@ -37,18 +38,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           pip install -r requirements.txt
-      - name: Download temporary job assets
+      - name: Download temporary audio
         env:
           GH_TOKEN: ${{ github.token }}
           AUDIO_ID: ${{ inputs.audio_asset_id }}
-          LYRICS_ID: ${{ inputs.lyrics_asset_id }}
         run: |
           mkdir -p job
           gh api -H "Accept: application/octet-stream" "/repos/${{ github.repository }}/releases/assets/$AUDIO_ID" > job/audio
+      - name: Download optional supplied text
+        if: ${{ inputs.lyrics_asset_id != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LYRICS_ID: ${{ inputs.lyrics_asset_id }}
+        run: |
           gh api -H "Accept: application/octet-stream" "/repos/${{ github.repository }}/releases/assets/$LYRICS_ID" > job/lyrics.txt
       - name: Generate LRC
+        shell: bash
         run: |
-          python scripts/process.py --audio job/audio --lyrics job/lyrics.txt --output job/result.lrc --language "${{ inputs.language }}" --model "${{ inputs.model }}" ${{ inputs.enhanced && '--enhanced' || '' }}
+          EXTRA=""
+          if [ -f job/lyrics.txt ] && [ -s job/lyrics.txt ]; then EXTRA="--lyrics job/lyrics.txt"; fi
+          python scripts/process.py --audio job/audio $EXTRA --output job/result.lrc --language "${{ inputs.language }}" --model "${{ inputs.model }}" ${{ inputs.enhanced && '--enhanced' || '' }}
       - name: Upload result
         env:
           GH_TOKEN: ${{ github.token }}
@@ -74,4 +83,4 @@ jobs:
           LYRICS_ID: ${{ inputs.lyrics_asset_id }}
         run: |
           gh api -X DELETE "/repos/${{ github.repository }}/releases/assets/$AUDIO_ID" || true
-          gh api -X DELETE "/repos/${{ github.repository }}/releases/assets/$LYRICS_ID" || true
+          if [ -n "$LYRICS_ID" ]; then gh api -X DELETE "/repos/${{ github.repository }}/releases/assets/$LYRICS_ID" || true; fi
