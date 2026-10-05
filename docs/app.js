@@ -3,6 +3,9 @@
   const $=id=>document.getElementById(id);
   const token=$("token"), audio=$("audio"), lyrics=$("lyrics"), start=$("start"), log=$("log");
   let file=null, activeRelease=null;
+  const TOKEN_KEY="usersync_web_github_pat_v1";
+  const savedToken=localStorage.getItem(TOKEN_KEY);
+  if(savedToken){token.value=savedToken; $("rememberToken").checked=true; setTimeout(()=>setStatus("טוקן שמור נטען מהמכשיר ✓"),0);}
 
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   function api(path, opts={}) {
@@ -46,7 +49,25 @@
   ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag")}));
   ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag")}));
   dz.addEventListener("drop",e=>choose(e.dataTransfer.files[0]));
-  $("checkToken").addEventListener("click",checkToken);
+  $("checkToken").addEventListener("click",async()=>{
+    await checkToken();
+    if($("rememberToken").checked && token.value.trim()){
+      localStorage.setItem(TOKEN_KEY,token.value.trim());
+      setStatus("החיבור תקין והטוקן נשמר במכשיר ✓");
+    }else{
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  });
+  $("rememberToken").addEventListener("change",()=>{
+    if($("rememberToken").checked && token.value.trim()) localStorage.setItem(TOKEN_KEY,token.value.trim());
+    else if(!$("rememberToken").checked) localStorage.removeItem(TOKEN_KEY);
+  });
+  $("forgetToken").addEventListener("click",()=>{
+    localStorage.removeItem(TOKEN_KEY);
+    token.value="";
+    $("rememberToken").checked=false;
+    setStatus("הטוקן נמחק מהמכשיר ✓");
+  });
 
   async function createRelease(id){
     addLog("Creating temporary draft release "+id);
