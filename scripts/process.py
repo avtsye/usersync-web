@@ -27,8 +27,10 @@ def transcribe(audio,model_name,language):
         audio,
         language=None if language=="auto" else language,
         word_timestamps=True,
-        vad_filter=True,
-        beam_size=5
+        vad_filter=False,
+        beam_size=5,
+        condition_on_previous_text=True,
+        initial_prompt="זהו שיר. תמלל את כל המילים ברצף, כולל שירה ארוכה וחזרות."
     )
     segments=[]; words=[]
     for seg in segs:
