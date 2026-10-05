@@ -4,11 +4,12 @@ on:
     inputs:
       release_id:
         required: true
-      audio_asset_id:
+      job_ref:
         required: true
-      lyrics_asset_id:
-        required: false
-        default: ""
+      has_lyrics:
+        required: true
+        default: false
+        type: boolean
       model:
         required: true
         default: medium
@@ -28,7 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout temporary job branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.job_ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -38,49 +42,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           pip install -r requirements.txt
-      - name: Download temporary audio
-        env:
-          GH_TOKEN: ${{ github.token }}
-          AUDIO_ID: ${{ inputs.audio_asset_id }}
-        run: |
-          mkdir -p job
-          gh api -H "Accept: application/octet-stream" "/repos/${{ github.repository }}/releases/assets/$AUDIO_ID" > job/audio
-      - name: Download optional supplied text
-        if: ${{ inputs.lyrics_asset_id != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          LYRICS_ID: ${{ inputs.lyrics_asset_id }}
-        run: |
-          gh api -H "Accept: application/octet-stream" "/repos/${{ github.repository }}/releases/assets/$LYRICS_ID" > job/lyrics.txt
       - name: Generate LRC
         shell: bash
         run: |
           EXTRA=""
           if [ -f job/lyrics.txt ] && [ -s job/lyrics.txt ]; then EXTRA="--lyrics job/lyrics.txt"; fi
-          python scripts/process.py --audio job/audio $EXTRA --output job/result.lrc --language "${{ inputs.language }}" --model "${{ inputs.model }}" ${{ inputs.enhanced && '--enhanced' || '' }}
+          python scripts/process.py --audio job/audio $EXTRA --output result.lrc --language "${{ inputs.language }}" --model "${{ inputs.model }}" ${{ inputs.enhanced && '--enhanced' || '' }}
       - name: Upload result
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ID: ${{ inputs.release_id }}
         run: |
           UPLOAD_URL=$(gh api "/repos/${{ github.repository }}/releases/$RELEASE_ID" --jq '.upload_url' | sed 's/{?name,label}//')
-          curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @job/result.lrc "$UPLOAD_URL?name=result.lrc"
+          curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @result.lrc "$UPLOAD_URL?name=result.lrc"
       - name: Mark failed job
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ID: ${{ inputs.release_id }}
         run: |
-          mkdir -p job
-          echo "העיבוד נכשל ב-GitHub Actions. פתח את לשונית Actions במאגר כדי לראות את השגיאה המלאה." > job/error.txt
+          echo "העיבוד נכשל ב-GitHub Actions. פתח את לשונית Actions במאגר כדי לראות את השגיאה המלאה." > error.txt
           UPLOAD_URL=$(gh api "/repos/${{ github.repository }}/releases/$RELEASE_ID" --jq '.upload_url' | sed 's/{?name,label}//')
-          curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: text/plain; charset=utf-8" --data-binary @job/error.txt "$UPLOAD_URL?name=error.txt" || true
-      - name: Delete source assets
+          curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: text/plain; charset=utf-8" --data-binary @error.txt "$UPLOAD_URL?name=error.txt" || true
+      - name: Delete temporary job branch
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          AUDIO_ID: ${{ inputs.audio_asset_id }}
-          LYRICS_ID: ${{ inputs.lyrics_asset_id }}
+          JOB_REF: ${{ inputs.job_ref }}
         run: |
-          gh api -X DELETE "/repos/${{ github.repository }}/releases/assets/$AUDIO_ID" || true
-          if [ -n "$LYRICS_ID" ]; then gh api -X DELETE "/repos/${{ github.repository }}/releases/assets/$LYRICS_ID" || true; fi
+          REF_NAME="${JOB_REF#refs/heads/}"
+          gh api -X DELETE "/repos/${{ github.repository }}/git/refs/heads/$REF_NAME" || true
