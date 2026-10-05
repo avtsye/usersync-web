@@ -56,6 +56,16 @@ jobs:
         run: |
           UPLOAD_URL=$(gh api "/repos/${{ github.repository }}/releases/$RELEASE_ID" --jq '.upload_url' | sed 's/{?name,label}//')
           curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @job/result.lrc "$UPLOAD_URL?name=result.lrc"
+      - name: Mark failed job
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+        run: |
+          mkdir -p job
+          echo "העיבוד נכשל ב-GitHub Actions. פתח את לשונית Actions במאגר כדי לראות את השגיאה המלאה." > job/error.txt
+          UPLOAD_URL=$(gh api "/repos/${{ github.repository }}/releases/$RELEASE_ID" --jq '.upload_url' | sed 's/{?name,label}//')
+          curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: text/plain; charset=utf-8" --data-binary @job/error.txt "$UPLOAD_URL?name=error.txt" || true
       - name: Delete source assets
         if: always()
         env:
