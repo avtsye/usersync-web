@@ -12,9 +12,9 @@ on:
         type: boolean
       model:
         required: true
-        default: medium
+        default: large-v3-turbo
         type: choice
-        options: [small, medium, large-v3-turbo]
+        options: [small, medium, large-v3-turbo, large-v3]
       language:
         required: true
         default: he
@@ -27,7 +27,7 @@ permissions:
 jobs:
   process:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout temporary job branch
         uses: actions/checkout@v4
